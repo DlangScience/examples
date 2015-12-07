@@ -1,0 +1,6 @@
+name "blocks"
+description "Splitting image into blocks."
+copyright "Copyright © 2015, Ilya Yaroshenko"
+authors "Ilya Yaroshenko"
+dependency "imageformats" version="~>5.1.0"
+dependency "dip80-ndslice" version="~>0.7.0"
