@@ -1,90 +1,136 @@
 import std.experimental.ndslice;
 
 /++
+A median filter is implemented as an example. The function
+`movingWindowByChannel` can also be used with other filters that use a sliding
+window as the argument, in particular with convolution matrices such as the
+$(LINK2 https://en.wikipedia.org/wiki/Sobel_operator, Sobel operator).
+
+`movingWindowByChannel` iterates over an image in sliding window mode.
+Each window is transferred to a `filter`, which calculates the value of the
+pixel that corresponds to the given window.
+
+This function does not calculate border cases in which a window overlaps
+the image partially. However, the function can still be used to carry out such
+calculations. That can be done by creating an amplified image, with the edges
+reflected from the original image, and then applying the given function to the
+new file.
+
+Note: You can find the example at
+$(LINK2 https://github.com/DlangScience/examples/tree/master/image_processing/median-filter, GitHub).
+
 Params:
-	image = изображение размерности `(h, w, c)`,
-		где с - количество каналов в изображении
-	nr = количество строк в окне
-	nс = количество колонок в окне
+    filter = unary function. Dimension window 2D is the argument.
+    image = image dimensions `(h, w, c)`,
+        where с is the number of channels in the image
+    nr = number of rows in the window
+    nс = number of columns in the window
+
 Returns:
-	изображение размерности `(h - nr + 1, w - nc + 1, c)`,
-		где с - количество каналов в изображении.
-		Гарантировано плотнаое размещение данных в памяти.
+    image dimensions `(h - nr + 1, w - nc + 1, c)`,
+        where с is the number of channels in the image.
+        Dense data layout is guaranteed.
 +/
-Slice!(3, C*) byChannelMovingWindow(alias filter, C)
+
+Slice!(3, C*) movingWindowByChannel(alias filter, C)
 (Slice!(3, C*) image, size_t nr, size_t nc)
 {
-	import std.algorithm.iteration: map;
-	import std.array: array;
-	auto wnds = image        // 1. 3D : the last dimension is color channel 
-		.pack!1              // 2. 2D of 1D : packs the last dimension
-		.windows(nr, nc)     // 3. 2D of 2D of 1D : splits image to overlapping windows
-		.unpack              // 4. 5D : unpacks windows
-		.transposed!(0, 1, 4)// 5. 5D : brings color channel dimension to third position
-		.pack!2;             // 6. 3D of 2D : packs the last two dimensions
-	return wnds
-		.byElement           // 7. Range of 2D : gets the range of all elements in `wnds`
-		.map!filter          // 8. Range of C : 2D to C lazy conversion
-		.array               // 9. C[] : sole memory allocation in this function
-		.sliced(wnds.shape); //10. 3D : returns slice with corresponding shape
+    import std.algorithm.iteration: map;
+    import std.array: array;
+
+        // 0. 3D
+        // The last dimension represents the color channel.
+    auto wnds = image
+        // 1. 2D composed of 1D
+        // Packs the last dimension.
+        .pack!1
+        // 2. 2D composed of 2D composed of 1D
+        // Splits image into overlapping windows.
+        .windows(nr, nc)
+        // 3. 5D
+        // Unpacks the windows.
+        .unpack
+        // 4. 5D
+        // Brings the color channel dimension to the third position.
+        .transposed!(0, 1, 4)
+        // 5. 3D Composed of 2D
+        // Packs the last two dimensions.
+        .pack!2;
+
+    return wnds
+        // 6. Range composed of 2D
+        // Gathers all windows in the range.
+        .byElement
+        // 7. Range composed of pixels
+        // 2D to pixel lazy conversion.
+        .map!filter
+        // 8. `C[]`
+        // The only memory allocation in this function.
+        .array
+        // 9. 3D
+        // Returns slice with corresponding shape.
+        .sliced(wnds.shape);
 }
 
 /++
 Params:
-	r = input range
-	buf = буффер с длинной не менее количества элементов в `r`
+    r = input range
+    buf = buffer with length no less than the number of elements in `r`
 Returns:
-	медианное значение в рэндже `r`
+    median value over the range `r`
 +/
 T median(Range, T)(Range r, T[] buf)
 {
-	import std.algorithm.sorting: sort;
-	size_t n;
-	foreach(e; r)
-		buf[n++] = e;
-	buf[0..n].sort();
-	immutable m = n >> 1;
-	return n & 1 ? buf[m] : cast(T)((buf[m-1] + buf[m])/2);
+    import std.algorithm.sorting: sort;
+    size_t n;
+    foreach (e; r)
+        buf[n++] = e;
+    buf[0 .. n].sort();
+    immutable m = n >> 1;
+    return n & 1 ? buf[m] : cast(T)((buf[m - 1] + buf[m]) / 2);
 }
 
 /++
-Работает как с цветными так и с чернобелыми изображениями
+This program works both with color and grayscale images.
 +/
 void main(string[] args)
 {
-	import imageformats; // can be found at code.dlang.org
-	import std.conv, std.path, std.getopt;
+    import std.conv: to;
+    import std.getopt: getopt, defaultGetoptPrinter;
+    import std.path: stripExtension;
 
-	uint nr, nc, def = 3;
-	auto helpInformation = args.getopt(
-		"nr", "number of rows in window, default value is " ~ def.to!string, &nr, 
-		"nc", "number of columns in window default value equals to nr", &nc);
-	if(helpInformation.helpWanted)
-	{
-		defaultGetoptPrinter(
-			"Usage: median-filter [<options...>] [<file_names...>]\noptions:", 
-			helpInformation.options);
-		return;
-	}
-	if(!nr) nr = def;
-	if(!nc) nc = nr;
+    uint nr, nc, def = 3;
+    auto helpInformation = args.getopt(
+        "nr", "number of rows in window, default value is " ~ def.to!string, &nr,
+        "nc", "number of columns in window, default value is equal to nr", &nc);
+    if (helpInformation.helpWanted)
+    {
+        defaultGetoptPrinter(
+            "Usage: median-filter [<options...>] [<file_names...>]\noptions:",
+            helpInformation.options);
+        return;
+    }
+    if (!nr) nr = def;
+    if (!nc) nc = nr;
 
-	auto buf = new ubyte[nr * nc];
+    auto buf = new ubyte[nr * nc];
 
-	foreach(name; args[1..$])
-	{
-		IFImage image = read_image(name);
+    foreach (name; args[1 .. $])
+    {
+        import imageformats; // can be found at code.dlang.org
 
-		auto ret = image.pixels
-			.sliced(image.h, image.w, image.c)
-			.byChannelMovingWindow
-				!(window => median(window.byElement, buf))
-				 (nr, nc);
+        IFImage image = read_image(name);
 
-		write_image(
-			name.stripExtension ~ "_filtered.png",
-			ret.length!1,
-			ret.length!0,
-			(&ret[0, 0, 0])[0..ret.elementsCount]);
-	}
+        auto ret = image.pixels
+            .sliced(image.h, image.w, image.c)
+            .movingWindowByChannel
+                !(window => median(window.byElement, buf))
+                 (nr, nc);
+
+        write_image(
+            name.stripExtension ~ "_filtered.png",
+            ret.length!1,
+            ret.length!0,
+            (&ret[0, 0, 0])[0 .. ret.elementsCount]);
+    }
 }
