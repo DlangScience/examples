@@ -24,10 +24,10 @@
 import std.range : iota;
 import std.array : array;
 import std.algorithm;
-import std.experimental.ndslice;
 import std.datetime;
 import std.conv : to;
 import std.stdio;
+import mir.ndslice;
 
 enum testCount = 10_000;
 double[] means;

@@ -1,5 +1,5 @@
 import std.algorithm: each;
-import std.experimental.ndslice;
+import mir.ndslice;
 void main() {
 	foreach(s, selection; [[size_t(2), 3], [size_t(2), 3, 6, 7]])
 	{
