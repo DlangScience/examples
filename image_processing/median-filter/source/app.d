@@ -1,4 +1,4 @@
-import std.experimental.ndslice;
+import mir.ndslice;
 
 /++
 A median filter is implemented as an example. The function
