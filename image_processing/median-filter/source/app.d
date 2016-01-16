@@ -81,13 +81,14 @@ Returns:
 +/
 T median(Range, T)(Range r, T[] buf)
 {
-    import std.algorithm.sorting: sort;
+    import std.algorithm.sorting;
     size_t n;
     foreach (e; r)
         buf[n++] = e;
-    buf[0 .. n].sort();
     immutable m = n >> 1;
-    return n & 1 ? buf[m] : cast(T)((buf[m - 1] + buf[m]) / 2);
+    buf[0..n].topN(m);
+    //buf[0..n].sort();
+    return buf[m];
 }
 
 /++
